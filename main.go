@@ -75,8 +75,6 @@ func GetDeploySecret(configurationProvider common.ConfigurationProvider, secretI
 }
 
 func GetAllApps(token string) {
-	//see list of registered_apps
-	// curl -X GET -H "Authorization:Bearer sgsRXX1xg6v-uCrGNEWqvw" https://apex.oracle.com/pls/apex/dco/deploy/registered_apps/
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 
@@ -86,9 +84,7 @@ func GetAllApps(token string) {
 	if err != nil {
 		fmt.Println("could not create request")
 	}
-	//r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Authorization", "Bearer "+token)
-	//fmt.Println(r.Header)
 
 	client := http.Client{
 		Timeout: 30 * time.Second,
@@ -102,7 +98,7 @@ func GetAllApps(token string) {
 	// Get token from map
 	body := map[string]interface{}{}
 	json.NewDecoder(res.Body).Decode(&body)
-	//token := body["access_token"].(string)
+	//apps := body["items"].(string)
 	fmt.Println(body)
 }
 
@@ -119,7 +115,6 @@ func GetToken(cred string) string {
 	}
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Authorization", strings.Split(cred, ":")[1])
-	//fmt.Println(r.Header)
 
 	client := http.Client{
 		Timeout: 30 * time.Second,
