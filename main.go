@@ -17,13 +17,7 @@ import (
 )
 
 // example cli signature string
-// rockette deploy -a 19731 -u https://apex.oracle.com/pls/apex/erudition/ -s ocid1.vaultsecret.oc1.phx.realocidhereasljsaflkasdjfewkrjllhkjyfvj -f ackie
-// simplified
 // rocketo deploy https://apex.oracle.com/pls/apex/erudition/ ocid1.vaultsecret.oc1.phx.realocidhereasljsaflkasdjfewkrjllhkjyfvj <optional: file> (if deploying) <optional: app id>
-
-// Provider used for testing locally - normally use resource principal
-// Environment Variables must be properly set for this to work
-// Most come from api key config, secret ocid is obtained from secrets
 
 type Config struct {
 	//GrantType   string `yaml:"grant_type"`
@@ -32,6 +26,9 @@ type Config struct {
 	Token string `json:"access_token"`
 }
 
+// Provider used for testing locally - eventually offer resource principal option as well
+// Environment Variables must be properly set for this to work
+// Most come from api key config, secret ocid is obtained from secrets in vault
 func initializeLocalConfigurationProvider() common.ConfigurationProvider {
 	privateKey := os.Getenv("pem")
 	tenancyOCID := os.Getenv("tenancyOCID")
@@ -68,12 +65,13 @@ func GetDeploySecret(configurationProvider common.ConfigurationProvider, secretI
 		panic(err)
 	}
 
-	// Convert to string
+	// Convert to string and return
 	cred := string(rawDecodedText)
 
 	return cred
 }
 
+// Use token to make api call returning list of registered apps
 func GetAllApps(token string) {
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
