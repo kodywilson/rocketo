@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/oracle/oci-go-sdk/v65/common/auth"
 	"github.com/oracle/oci-go-sdk/v65/example/helpers"
 	"github.com/oracle/oci-go-sdk/v65/secrets"
 )
@@ -42,13 +43,17 @@ func initializeLocalConfigurationProvider() common.ConfigurationProvider {
 	return configurationProvider
 }
 
-func GetDeploySecret(configurationProvider common.ConfigurationProvider, secretID string) string {
-	client, err := secrets.NewSecretsClientWithConfigurationProvider(configurationProvider)
+// func GetDeploySecret(configurationProvider common.ConfigurationProvider, secretID string) string {
+func GetDeploySecret(secretID string) string {
+	provider, err := auth.InstancePrincipalConfigurationProvider()
+	helpers.FatalIfError(err)
+	client, err := secrets.NewSecretsClientWithConfigurationProvider(provider)
 	helpers.FatalIfError(err)
 
 	// Create a request and dependent object(s).
 	req := secrets.GetSecretBundleRequest{
-		SecretId: common.String(secretID),
+		//SecretId: common.String(secretID),
+		SecretId: &secretID,
 		Stage:    secrets.GetSecretBundleStageLatest,
 	}
 
@@ -107,7 +112,7 @@ func GetToken(cred string) string {
 	data.Set("grant_type", "client_credentials")
 
 	token_url := os.Args[2] + "oauth/token"
-	fmt.Println(token_url)
+	//fmt.Println(token_url)
 
 	r, err := http.NewRequest("POST", token_url, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -133,9 +138,32 @@ func GetToken(cred string) string {
 	return token
 }
 
+func deployExport(token string) {
+	f, err := os.Open(os.Args[3])
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer f.Close()
+	deployURL := os.Args[2] + "deploy/app/0/"
+	fmt.Println(deployURL)
+	req, err := http.NewRequest("POST", deployURL, f)
+	if err != nil {
+		fmt.Println(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/sql")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(resp)
+	defer resp.Body.Close()
+}
+
 func PrintArgsErrors() {
 	fmt.Println("Please pass required args:")
-	fmt.Println("command (deploy) url filename vault_secret_ocid optional_app_id")
+	fmt.Println("command (deploy) url filename vault_secret_ocid -e|i (mode) optional_app_id")
 	fmt.Println("deploy https://apex.oracle.com/pls/apex/endpoint/ ackie ocid1.vaultsecret.oc1.phx.realocidhereasljsaflkasdjfewkrjllhkjyfvj")
 	os.Exit(1)
 }
@@ -147,16 +175,24 @@ func spacer() {
 }
 
 func ValidateArgs() bool {
-	if len(os.Args) < 4 || len(os.Args[3]) < 75 {
+	if len(os.Args) < 5 {
+		fmt.Println("Too few arguments.")
 		return false
 	}
-	if os.Args[1] != "deploy" {
+	if os.Args[1] != "deploy" || os.Args[1] != "export" {
+		fmt.Println("First arg needs to be deploy or export")
 		return false
 	}
 	if !ValidateUrl(os.Args[2]) {
+		fmt.Println("Double check the URL")
 		return false
 	}
-	if !ValidateOcid(os.Args[3], "secret") {
+	if !ValidateOcid(os.Args[4], "secret") {
+		fmt.Println("Double check the secret ocid")
+		return false
+	}
+	if os.Args[5] != "-e" || os.Args[5] != "-i" {
+		fmt.Println("Fifth argument, -e to use ENV variables, -i to use instance principals")
 		return false
 	}
 	return true
@@ -182,9 +218,19 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Connecting to OCI and grabbing vault secret...")
-	configurationProvider := initializeLocalConfigurationProvider()
-	spacer()
-	cred := GetDeploySecret(configurationProvider, os.Getenv("secret_ocid"))
+	var cred string
+	if os.Args[5] == "-e" { // use below when not using instance principals
+		//configurationProvider := initializeLocalConfigurationProvider()
+		//cred = GetDeploySecret(configurationProvider, os.Getenv("secret_ocid"))
+		cred = GetDeploySecret(os.Getenv("secret_ocid"))
+	} else if os.Args[5] == "-i" {
+		cred = GetDeploySecret(os.Args[4])
+	}
+	// below uses instance principals
 	token := GetToken(cred)
-	GetAllApps(token)
+	//spacer()
+	//GetAllApps(token)
+	//spacer()
+	deployExport(token)
+	//deployExport("putarealtokenhereok")
 }
