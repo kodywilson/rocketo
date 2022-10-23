@@ -79,6 +79,40 @@ func GetDeploySecret(secretID string) string {
 	return cred
 }
 
+// so bad, refactor these GetDeploySecret funcs
+func GetDeploySecret2(configurationProvider common.ConfigurationProvider, secretID string) string {
+	client, err := secrets.NewSecretsClientWithConfigurationProvider(configurationProvider)
+	helpers.FatalIfError(err)
+
+	// Create a request and dependent object(s).
+	req := secrets.GetSecretBundleRequest{
+		SecretId: common.String(secretID),
+		//SecretId: &secretID,
+		Stage: secrets.GetSecretBundleStageLatest,
+	}
+
+	// Send the request using the service client
+	resp, err := client.GetSecretBundle(context.Background(), req)
+	helpers.FatalIfError(err)
+
+	// Retrieve value from the response.
+	var content string
+	base64Details, ok := resp.SecretBundleContent.(secrets.Base64SecretBundleContentDetails)
+	if ok {
+		content = *base64Details.Content
+	}
+	// Decode Base64
+	rawDecodedText, err := b64.StdEncoding.DecodeString(content)
+	if err != nil {
+		panic(err)
+	}
+
+	// Convert to string
+	cred := string(rawDecodedText)
+
+	return cred
+}
+
 func GetAllApps(token string) {
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
@@ -175,11 +209,11 @@ func spacer() {
 }
 
 func ValidateArgs() bool {
-	if len(os.Args) < 5 {
+	if len(os.Args) < 6 {
 		fmt.Println("Too few arguments.")
 		return false
 	}
-	if os.Args[1] != "deploy" || os.Args[1] != "export" {
+	if os.Args[1] != "deploy" && os.Args[1] != "export" {
 		fmt.Println("First arg needs to be deploy or export")
 		return false
 	}
@@ -191,7 +225,7 @@ func ValidateArgs() bool {
 		fmt.Println("Double check the secret ocid")
 		return false
 	}
-	if os.Args[5] != "-e" || os.Args[5] != "-i" {
+	if os.Args[5] != "-e" && os.Args[5] != "-i" {
 		fmt.Println("Fifth argument, -e to use ENV variables, -i to use instance principals")
 		return false
 	}
@@ -220,13 +254,13 @@ func main() {
 	fmt.Println("Connecting to OCI and grabbing vault secret...")
 	var cred string
 	if os.Args[5] == "-e" { // use below when not using instance principals
-		//configurationProvider := initializeLocalConfigurationProvider()
-		//cred = GetDeploySecret(configurationProvider, os.Getenv("secret_ocid"))
-		cred = GetDeploySecret(os.Getenv("secret_ocid"))
+		configurationProvider := initializeLocalConfigurationProvider()
+		cred = GetDeploySecret2(configurationProvider, os.Getenv("secret_ocid"))
 	} else if os.Args[5] == "-i" {
+		// below uses instance principals
 		cred = GetDeploySecret(os.Args[4])
 	}
-	// below uses instance principals
+	fmt.Println(cred)
 	token := GetToken(cred)
 	//spacer()
 	//GetAllApps(token)
